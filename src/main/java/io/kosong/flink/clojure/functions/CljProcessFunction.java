@@ -1,9 +1,11 @@
 package io.kosong.flink.clojure.functions;
 
 
+import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
+import clojure.lang.Namespace;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
@@ -23,6 +25,7 @@ public class CljProcessFunction<I, O> extends ProcessFunction<I, O>
     private transient boolean initialized = false;
     private transient Object state;
 
+    private final Namespace namespace;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
@@ -34,6 +37,7 @@ public class CljProcessFunction<I, O> extends ProcessFunction<I, O>
     private TypeInformation<O> returnType;
 
     public CljProcessFunction(APersistentMap args) {
+        namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         processElementFn = (IFn) Keyword.intern("processElement").invoke(args);
@@ -55,6 +59,7 @@ public class CljProcessFunction<I, O> extends ProcessFunction<I, O>
     }
 
     private void init() {
+        Clojure.var("clojure.core/require").invoke(namespace.getName());
         if (initFn != null) {
             state = initFn.invoke(this);
         }

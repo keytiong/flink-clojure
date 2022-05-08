@@ -1,16 +1,17 @@
 (ns io.kosong.flink.clojure.core
-  (:import (io.kosong.flink.clojure NippySerializer)
+  (:import (io.kosong.flink.clojure NippySerializer CljTimestampAssigner)
+           (clojure.lang RT)
            (clojure.lang PersistentVector PersistentHashMap PersistentHashSet PersistentArrayMap PersistentStructMap
-                         PersistentTreeMap PersistentTreeSet PersistentList)
+                         PersistentTreeMap PersistentTreeSet PersistentList APersistentMap)
            (io.kosong.flink.clojure.functions CljMapFunction CljFlatMapFunction CljKeyedProcessFunction
                                               CljProcessFunction CljSinkFunction CljSourceFunction CljKeySelector
-                                              CljReduceFunction CljWindowFunction)
+                                              CljReduceFunction CljWindowFunction CljFilterFunction CljCoFlatMapFunction CljProcessWindowFunction CljSimpleReduceFunction)
            (org.apache.flink.api.common.typeinfo TypeInformation)))
 
 (def ^:private clojure-collection-types
   [PersistentList
-   PersistentVector  PersistentHashSet PersistentTreeSet
-   PersistentHashMap PersistentArrayMap PersistentStructMap PersistentTreeMap])
+   PersistentVector PersistentHashSet #_PersistentTreeSet
+   PersistentHashMap PersistentArrayMap PersistentStructMap #_PersistentTreeMap])
 
 (defn register-clojure-types [env]
   (let [exec-config (.getConfig env)]
@@ -18,34 +19,31 @@
       (.registerTypeWithKryoSerializer exec-config type NippySerializer))
     env))
 
-(defmulti make-fn :fn :default nil)
+(defn- ensure-namespace [args]
+  (if (:ns args)
+    args
+    (assoc args :ns *ns*)))
 
-(defmethod make-fn :map [& {:as args}]
-  (CljMapFunction. args))
+(def keyword->fn-class
+  {:map            CljMapFunction
+   :filter         CljFilterFunction
+   :flat-map       CljFlatMapFunction
+   :keyed-process  CljKeyedProcessFunction
+   :process        CljProcessFunction
+   :reduce         CljReduceFunction
+   :window         CljWindowFunction
+   :sink           CljSinkFunction
+   :source         CljSourceFunction
+   :key-selector   CljKeySelector
+   :co-flat-map    CljCoFlatMapFunction
+   :process-window CljProcessWindowFunction
+   :simple-reduce  CljSimpleReduceFunction})
 
-(defmethod make-fn :flat-map [& {:as args}]
-  (CljFlatMapFunction. args))
-
-(defmethod make-fn :keyed-process [& {:as args}]
-  (CljKeyedProcessFunction. args))
-
-(defmethod make-fn :process [& {:as args}]
-  (CljProcessFunction. args))
-
-(defmethod make-fn :reduce [& {:as args}]
-  (CljReduceFunction. args))
-
-(defmethod make-fn :window [& {:as args}]
-  (CljWindowFunction. args))
-
-(defmethod make-fn :sink [& {:as args}]
-  (CljSinkFunction. args))
-
-(defmethod make-fn :source [& {:as args}]
-  (CljSourceFunction. args))
-
-(defmethod make-fn :key-selector [& {:as args}]
-  (CljKeySelector. args))
+(defn flink-fn [args]
+  (let [fn-class (keyword->fn-class (:fn args))
+        ctor (.getConstructor fn-class (into-array Class [APersistentMap]))
+        args     (ensure-namespace args)]
+    (.newInstance ctor (into-array [args]))))
 
 (defn type-info-of [class-or-obj]
   (let [cls (if (class? class-or-obj)
@@ -54,4 +52,9 @@
     (TypeInformation/of ^Class cls)))
 
 (defmacro fdef [name & {:as body}]
-  `(def ~name (make-fn ~body)))
+  (let [body (ensure-namespace body)]
+    `(def ~name (flink-fn ~body))))
+
+(defn timestamp-assigner [& {:as body}]
+  (let [body (ensure-namespace body)]
+    (CljTimestampAssigner. body)))

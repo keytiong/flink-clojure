@@ -1,8 +1,10 @@
 package io.kosong.flink.clojure.functions;
 
+import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
+import clojure.lang.Namespace;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
@@ -14,6 +16,7 @@ import org.apache.flink.util.Collector;
 
 public class CljFlatMapFunction<IN, OUT> extends RichFlatMapFunction<IN, OUT> implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
+    private final Namespace namespace;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
@@ -26,6 +29,7 @@ public class CljFlatMapFunction<IN, OUT> extends RichFlatMapFunction<IN, OUT> im
     private transient boolean initialized;
 
     public CljFlatMapFunction(APersistentMap args) {
+        namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
@@ -41,6 +45,7 @@ public class CljFlatMapFunction<IN, OUT> extends RichFlatMapFunction<IN, OUT> im
     }
 
     private void init() {
+        Clojure.var("clojure.core/require").invoke(namespace.getName());
         if (initFn != null) {
             state = initFn.invoke(this);
         }

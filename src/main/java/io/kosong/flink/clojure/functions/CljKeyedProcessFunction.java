@@ -1,9 +1,11 @@
 package io.kosong.flink.clojure.functions;
 
 
+import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
+import clojure.lang.Namespace;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
@@ -29,11 +31,13 @@ public class CljKeyedProcessFunction<K, I, O> extends KeyedProcessFunction<K, I,
     private final IFn closeFn;
     private final IFn onTimerFn;
     private final IFn processElementFn;
+    private final Namespace namespace;
     private final IFn initFn;
     private final IFn initializeStateFn;
     private final IFn snapshotStateFn;
 
     public CljKeyedProcessFunction(APersistentMap args) {
+        namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
@@ -49,10 +53,10 @@ public class CljKeyedProcessFunction<K, I, O> extends KeyedProcessFunction<K, I,
     }
 
     private void init() {
+        Clojure.var("clojure.core/require").invoke(namespace.getName());
         if (initFn != null) {
             this.state = initFn.invoke(this);
         }
-
         initialized = true;
     }
 

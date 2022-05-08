@@ -1,9 +1,11 @@
 package io.kosong.flink.clojure.functions;
 
 
+import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
+import clojure.lang.Namespace;
 import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -21,6 +23,7 @@ implements CheckpointedFunction {
     private transient boolean initialized = false;
     private transient Object state;
 
+    private final Namespace namespace;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
@@ -32,6 +35,7 @@ implements CheckpointedFunction {
 
 
     public CljSinkFunction(APersistentMap args) {
+        namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         invokeFn = (IFn) Keyword.intern("invoke").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
@@ -43,6 +47,7 @@ implements CheckpointedFunction {
     }
 
     private void init() {
+        Clojure.var("clojure.core/require").invoke(namespace.getName());
         if (initFn != null) {
             state = initFn.invoke(this);
         }

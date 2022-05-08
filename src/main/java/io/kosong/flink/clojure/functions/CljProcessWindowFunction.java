@@ -1,48 +1,64 @@
 package io.kosong.flink.clojure.functions;
 
+
 import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import clojure.lang.Namespace;
-import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.windows.Window;
+import org.apache.flink.util.Collector;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+public class CljProcessWindowFunction<IN, OUT, KEY, W extends Window> extends ProcessWindowFunction<IN, OUT,KEY,W>
+        implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
-public class CljFilterFunction<T> extends RichFilterFunction<T>
-        implements ResultTypeQueryable<T>, CheckpointedFunction {
+    private static final Logger log = LogManager.getLogger(CljProcessWindowFunction.class);
+
+    private transient boolean initialized = false;
+    private transient Object state;
 
     private final Namespace namespace;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
+    private final IFn processFn;
+    private final IFn clearFn;
     private final IFn initializeStateFn;
-    private final IFn filterFn;
     private final IFn snapshotStateFn;
-    private final TypeInformation<T> returnType;
 
-    private transient Object state;
-    private transient boolean initialized;
+    private TypeInformation<OUT> returnType;
 
-    public CljFilterFunction(APersistentMap args) {
+    public CljProcessWindowFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
+        processFn = (IFn) Keyword.intern("process").invoke(args);
+        clearFn = (IFn) Keyword.intern("clear").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
-        filterFn = (IFn) Keyword.intern("filter").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation<T>) Keyword.intern("returns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
     }
 
     @Override
-    public boolean filter(T value) throws Exception {
-        return (Boolean) filterFn.invoke(this, value);
+    public void process(KEY key, ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx, Iterable<IN> elements, Collector<OUT> out) throws Exception {
+        processFn.invoke(this, key, ctx, elements, out);
+    }
+
+    @Override
+    public void clear(ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx) {
+        if (clearFn != null) {
+            clearFn.invoke(this, ctx);
+        }
     }
 
     private void init() {
@@ -59,7 +75,6 @@ public class CljFilterFunction<T> extends RichFilterFunction<T>
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        super.open(parameters);
         if (!initialized) {
             init();
         }
@@ -73,11 +88,10 @@ public class CljFilterFunction<T> extends RichFilterFunction<T>
         if (closeFn != null) {
             closeFn.invoke(this);
         }
-        super.close();
     }
 
     @Override
-    public TypeInformation<T> getProducedType() {
+    public TypeInformation<OUT> getProducedType() {
         return returnType;
     }
 

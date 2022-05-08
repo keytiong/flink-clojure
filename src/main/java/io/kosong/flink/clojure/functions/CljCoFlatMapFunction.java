@@ -5,48 +5,57 @@ import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import clojure.lang.Namespace;
-import org.apache.flink.api.common.functions.RichFilterFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
+import org.apache.flink.util.Collector;
 
-
-public class CljFilterFunction<T> extends RichFilterFunction<T>
-        implements ResultTypeQueryable<T>, CheckpointedFunction {
+public class CljCoFlatMapFunction<IN1, IN2, OUT> extends RichCoFlatMapFunction<IN1, IN2, OUT> implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
     private final Namespace namespace;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
     private final IFn initializeStateFn;
-    private final IFn filterFn;
+    private final IFn flatMap1Fn;
+    private final IFn flatMap2Fn;
     private final IFn snapshotStateFn;
-    private final TypeInformation<T> returnType;
+    private final TypeInformation<OUT> returnType;
 
     private transient Object state;
     private transient boolean initialized;
 
-    public CljFilterFunction(APersistentMap args) {
+    public CljCoFlatMapFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
-        filterFn = (IFn) Keyword.intern("filter").invoke(args);
+        flatMap1Fn = (IFn) Keyword.intern("flatMap1").invoke(args);
+        flatMap2Fn = (IFn) Keyword.intern("flatMap2").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation<T>) Keyword.intern("returns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
     }
 
     @Override
-    public boolean filter(T value) throws Exception {
-        return (Boolean) filterFn.invoke(this, value);
+    public void flatMap1(IN1 value, Collector<OUT> out) throws Exception {
+        flatMap1Fn.invoke(this, value, out);
+    }
+
+    @Override
+    public void flatMap2(IN2 value, Collector<OUT> out) throws Exception {
+        flatMap2Fn.invoke(this, value, out);
     }
 
     private void init() {
+
         Clojure.var("clojure.core/require").invoke(namespace.getName());
+
         if (initFn != null) {
             state = initFn.invoke(this);
         }
@@ -59,7 +68,6 @@ public class CljFilterFunction<T> extends RichFilterFunction<T>
 
     @Override
     public void open(Configuration parameters) throws Exception {
-        super.open(parameters);
         if (!initialized) {
             init();
         }
@@ -73,11 +81,10 @@ public class CljFilterFunction<T> extends RichFilterFunction<T>
         if (closeFn != null) {
             closeFn.invoke(this);
         }
-        super.close();
     }
 
     @Override
-    public TypeInformation<T> getProducedType() {
+    public TypeInformation<OUT> getProducedType() {
         return returnType;
     }
 
