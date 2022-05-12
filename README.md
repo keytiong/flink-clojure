@@ -1,10 +1,11 @@
 # flink-clojure
-Clojure wrapper for Apache Flink
 
+Clojure wrapper for Apache Flink
 
 ## Usage
 
 ### Leiningen
+
 ```clojure
 [io.kosong.flink/flink-clojure "0.1.0-SNAPSHOT"]
 ```
@@ -26,24 +27,27 @@ Clojure wrapper for Apache Flink
    ;...
    ])
 
-(fk/fdef tokenizer
-  :fn :flat-map
-  :returns (fk/type-info-of [])
-  :flatMap (fn [this line collector]
-             (doseq [word (-> line .toLowerCase (.split "\\W+"))]
-               (.collect collector [word 1]))))
+(def tokenizer
+  (fk/flink-fn
+    {:fn      :flat-map
+     :returns (fk/type-info-of [])
+     :flatMap (fn [this line collector]
+                (doseq [word (-> line .toLowerCase (.split "\\W+"))]
+                  (.collect collector [word 1])))}))
 
-(fk/fdef counter
-  :fn :reduce
-  :returns (fk/type-info-of [])
-  :reduce (fn [this [word-1 count-1] [word-2 count-2]]
-            [word-1 (+ count-1 count-2)]))
+(def counter
+  (fk/flink-fn
+    {:fn      :reduce
+     :returns (fk/type-info-of [])
+     :reduce  (fn [this [word-1 count-1] [word-2 count-2]]
+                [word-1 (+ count-1 count-2)])}))
 
-(fk/fdef word-selector
-  :fn :key-selector
-  :returns (fk/type-info-of String)
-  :getKey (fn [this [word count]]
-            word))
+(def word-selector
+  (fk/flink-fn
+    {:fn      :key-selector
+     :returns (fk/type-info-of String)
+     :getKey  (fn [this [word count]]
+                word)}))
 
 (-> env
   (.fromCollection word-count-data)
@@ -56,6 +60,7 @@ Clojure wrapper for Apache Flink
 ```
 
 ## Build
+
 ```shell
 lein clean
 lein install
