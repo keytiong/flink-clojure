@@ -7,7 +7,7 @@ Clojure wrapper for Apache Flink
 ### Leiningen
 
 ```clojure
-[io.kosong.flink/flink-clojure "0.1.0-SNAPSHOT"]
+[io.kosong.flink/flink-clojure "0.1.0"]
 ```
 
 ## Example
