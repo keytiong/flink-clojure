@@ -7,9 +7,6 @@ import clojure.lang.Keyword;
 import clojure.lang.Namespace;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.runtime.state.FunctionInitializationContext;
-import org.apache.flink.runtime.state.FunctionSnapshotContext;
 
 public class CljSimpleReduceFunction<T> implements ReduceFunction<T> {
 

@@ -12,29 +12,28 @@ import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 
 
 public class CljMapFunction<IN, OUT> extends RichMapFunction<IN, OUT>
-implements ResultTypeQueryable<OUT>, CheckpointedFunction {
+        implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
+    private transient Object state;
+    private transient boolean initialized;
     private final Namespace namespace;
+    private final TypeInformation<OUT> returnType;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
     private final IFn initializeStateFn;
-    private final IFn mapFn;
     private final IFn snapshotStateFn;
-    private final TypeInformation<OUT> returnType;
-
-    private transient Object state;
-    private transient boolean initialized;
+    private final IFn mapFn;
 
     public CljMapFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
-        mapFn = (IFn) Keyword.intern("map").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
+        mapFn = (IFn) Keyword.intern("map").invoke(args);
     }
 
     @Override

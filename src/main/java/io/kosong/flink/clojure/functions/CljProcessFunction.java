@@ -14,13 +14,9 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public class CljProcessFunction<I, O> extends ProcessFunction<I, O>
         implements ResultTypeQueryable<O>, CheckpointedFunction {
-
-    private static final Logger log = LogManager.getLogger(CljProcessFunction.class);
 
     private transient boolean initialized = false;
     private transient Object state;

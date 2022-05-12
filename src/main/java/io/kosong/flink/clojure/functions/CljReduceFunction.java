@@ -29,13 +29,13 @@ public class CljReduceFunction<T> extends RichReduceFunction<T> implements Resul
 
     public CljReduceFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
-        reduceFn = (IFn) Keyword.intern("reduce").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
+        reduceFn = (IFn) Keyword.intern("reduce").invoke(args);
     }
 
     private void init() {
@@ -65,11 +65,6 @@ public class CljReduceFunction<T> extends RichReduceFunction<T> implements Resul
         super.close();
     }
 
-    @Override
-    public T reduce(T value1, T value2) throws Exception {
-        return (T) reduceFn.invoke(this, value1, value2);
-    }
-
     public TypeInformation getProducedType() {
         return returnType;
     }
@@ -88,5 +83,10 @@ public class CljReduceFunction<T> extends RichReduceFunction<T> implements Resul
         if (initializeStateFn != null) {
             initializeStateFn.invoke(this, context);
         }
+    }
+
+    @Override
+    public T reduce(T value1, T value2) throws Exception {
+        return (T) reduceFn.invoke(this, value1, value2);
     }
 }

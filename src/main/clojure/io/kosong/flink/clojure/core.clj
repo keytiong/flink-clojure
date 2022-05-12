@@ -1,11 +1,10 @@
 (ns io.kosong.flink.clojure.core
   (:import (io.kosong.flink.clojure NippySerializer CljTimestampAssigner)
-           (clojure.lang RT)
            (clojure.lang PersistentVector PersistentHashMap PersistentHashSet PersistentArrayMap PersistentStructMap
                          PersistentTreeMap PersistentTreeSet PersistentList APersistentMap)
            (io.kosong.flink.clojure.functions CljMapFunction CljFlatMapFunction CljKeyedProcessFunction
                                               CljProcessFunction CljSinkFunction CljSourceFunction CljKeySelector
-                                              CljReduceFunction CljWindowFunction CljFilterFunction CljCoFlatMapFunction CljProcessWindowFunction CljSimpleReduceFunction)
+                                              CljReduceFunction CljWindowFunction CljFilterFunction CljCoFlatMapFunction CljProcessWindowFunction CljSimpleReduceFunction CljSimpleAggregateFunction CljBroadcastProcessFunction CljCoProcessFunction CljKeyedBroadcastProcessFunction CljProcessJoinFunction CljKeyedCoProcessFunction CljCoMapFunction CljAsyncFunction CljProcessAllWindowFunction CljParallelSourceFunction)
            (org.apache.flink.api.common.typeinfo TypeInformation)))
 
 (def ^:private clojure-collection-types
@@ -25,23 +24,39 @@
     (assoc args :ns *ns*)))
 
 (def keyword->fn-class
-  {:map            CljMapFunction
-   :filter         CljFilterFunction
-   :flat-map       CljFlatMapFunction
-   :keyed-process  CljKeyedProcessFunction
-   :process        CljProcessFunction
-   :reduce         CljReduceFunction
-   :window         CljWindowFunction
-   :sink           CljSinkFunction
-   :source         CljSourceFunction
-   :key-selector   CljKeySelector
-   :co-flat-map    CljCoFlatMapFunction
-   :process-window CljProcessWindowFunction
-   :simple-reduce  CljSimpleReduceFunction})
+  {:source                  CljSourceFunction
+   :parallel-source         CljParallelSourceFunction
 
-(defn flink-fn [args]
+   :map                     CljMapFunction
+   :flat-map                CljFlatMapFunction
+   :filter                  CljFilterFunction
+   :reduce                  CljReduceFunction
+   :process                 CljProcessFunction
+
+   :key-selector            CljKeySelector
+   :keyed-process           CljKeyedProcessFunction
+   :keyed-broadcast-process CljKeyedBroadcastProcessFunction
+   :keyed-co-process        CljKeyedCoProcessFunction
+
+   :window                  CljWindowFunction
+   :process-window          CljProcessWindowFunction
+   :process-all-window      CljProcessAllWindowFunction
+   :simple-reduce           CljSimpleReduceFunction
+   :simple-aggregate        CljSimpleAggregateFunction
+
+   :co-map                  CljCoMapFunction
+   :co-flat-map             CljCoFlatMapFunction
+   :co-process              CljCoProcessFunction
+   :broadcast-process       CljBroadcastProcessFunction
+   :process-join            CljProcessJoinFunction
+
+   :async                   CljAsyncFunction
+
+   :sink                    CljSinkFunction})
+
+(defn flink-fn [& {:as args}]
   (let [fn-class (keyword->fn-class (:fn args))
-        ctor (.getConstructor fn-class (into-array Class [APersistentMap]))
+        ctor     (.getConstructor fn-class (into-array Class [APersistentMap]))
         args     (ensure-namespace args)]
     (.newInstance ctor (into-array [args]))))
 
@@ -52,8 +67,7 @@
     (TypeInformation/of ^Class cls)))
 
 (defmacro fdef [name & {:as body}]
-  (let [body (ensure-namespace body)]
-    `(def ~name (flink-fn ~body))))
+  `(def ~name (flink-fn ~body)))
 
 (defn timestamp-assigner [& {:as body}]
   (let [body (ensure-namespace body)]

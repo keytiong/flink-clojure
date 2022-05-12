@@ -14,26 +14,27 @@ import org.apache.flink.streaming.api.functions.windowing.RichWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.util.Collector;
 
-public class CljWindowFunction<IN, OUT, KEY, W extends Window> extends RichWindowFunction<IN, OUT, KEY, W> implements ResultTypeQueryable<OUT>, CheckpointedFunction {
+public class CljWindowFunction<IN, OUT, KEY, W extends Window> extends RichWindowFunction<IN, OUT, KEY, W>
+        implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
 
     private final Namespace namespace;
+    private final TypeInformation<OUT> returnType;
     private final IFn initFn;
     private final IFn initializeStateFn;
     private final IFn applyFn;
     private final IFn snapshotStateFn;
-    private final TypeInformation<OUT> returnType;
 
     private transient Object state;
     private transient boolean initialized;
 
     public CljWindowFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         applyFn = (IFn) Keyword.intern("apply").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
     }
 
     private void init() {
@@ -42,11 +43,6 @@ public class CljWindowFunction<IN, OUT, KEY, W extends Window> extends RichWindo
             state = initFn.invoke(this);
         }
         initialized = true;
-    }
-
-    @Override
-    public void apply(KEY key, W window, Iterable<IN> input, Collector<OUT> out) throws Exception {
-        applyFn.invoke(this, key, window, input, out);
     }
 
     @Override
@@ -69,5 +65,10 @@ public class CljWindowFunction<IN, OUT, KEY, W extends Window> extends RichWindo
         if (initializeStateFn != null) {
             initializeStateFn.invoke(this, context);
         }
+    }
+
+    @Override
+    public void apply(KEY key, W window, Iterable<IN> input, Collector<OUT> out) throws Exception {
+        applyFn.invoke(this, key, window, input, out);
     }
 }

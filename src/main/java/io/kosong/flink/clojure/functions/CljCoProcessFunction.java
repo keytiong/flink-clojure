@@ -1,53 +1,59 @@
 package io.kosong.flink.clojure.functions;
 
-
 import clojure.java.api.Clojure;
 import clojure.lang.APersistentMap;
 import clojure.lang.IFn;
 import clojure.lang.Keyword;
 import clojure.lang.Namespace;
-import org.apache.flink.api.common.eventtime.Watermark;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
-import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
+import org.apache.flink.util.Collector;
 
-public class CljSinkFunction<IN> extends RichSinkFunction<IN>
-        implements CheckpointedFunction {
+public class CljCoProcessFunction<IN1, IN2, OUT> extends CoProcessFunction<IN1, IN2, OUT>
+        implements ResultTypeQueryable<OUT>, CheckpointedFunction {
 
-    private transient boolean initialized = false;
     private transient Object state;
+    private transient boolean initialized;
 
     private final Namespace namespace;
+    private final TypeInformation<OUT> returnType;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
-    private final IFn invokeFn;
-    private final IFn initializeStateFn;
     private final IFn snapshotStateFn;
-    private final IFn writeWatermarkFn;
-    private final IFn finishFn;
+    private final IFn initializeStateFn;
+    private final IFn processElement1Fn;
+    private final IFn processElement2Fn;
+    private final IFn onTimerFn;
 
-
-    public CljSinkFunction(APersistentMap args) {
+    public CljCoProcessFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
-        invokeFn = (IFn) Keyword.intern("invoke").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        writeWatermarkFn = (IFn) Keyword.intern("writeWatermark").invoke(args);
-        finishFn = (IFn) Keyword.intern("finish").invoke(args);
+        processElement1Fn = (IFn) Keyword.intern("processElement1").invoke(args);
+        processElement2Fn = (IFn) Keyword.intern("processElement2").invoke(args);
+        onTimerFn = (IFn) Keyword.intern("onTimer").invoke(args);
     }
 
     private void init() {
         Clojure.var("clojure.core/require").invoke(namespace.getName());
         if (initFn != null) {
-            state = initFn.invoke(this);
+            this.state = initFn.invoke(this);
         }
         initialized = true;
+    }
+
+    public Object state() {
+        return this.state;
     }
 
     @Override
@@ -55,7 +61,6 @@ public class CljSinkFunction<IN> extends RichSinkFunction<IN>
         if (!initialized) {
             init();
         }
-
         if (openFn != null) {
             openFn.invoke(this, parameters);
         }
@@ -69,28 +74,8 @@ public class CljSinkFunction<IN> extends RichSinkFunction<IN>
     }
 
     @Override
-    public void invoke(IN value, Context context) throws Exception {
-        invokeFn.invoke(this, value, context);
-    }
-
-    @Override
-    public void writeWatermark(Watermark watermark) throws Exception {
-        super.writeWatermark(watermark);
-        if (writeWatermarkFn != null) {
-            writeWatermarkFn.invoke(this, watermark);
-        }
-    }
-
-    @Override
-    public void finish() throws Exception {
-        super.finish();
-        if (finishFn != null) {
-            finishFn.invoke(this);
-        }
-    }
-
-    public Object state() {
-        return this.state;
+    public TypeInformation<OUT> getProducedType() {
+        return returnType;
     }
 
     @Override
@@ -109,4 +94,22 @@ public class CljSinkFunction<IN> extends RichSinkFunction<IN>
             initializeStateFn.invoke(this, context);
         }
     }
+
+    @Override
+    public void processElement1(IN1 value, CoProcessFunction<IN1, IN2, OUT>.Context ctx, Collector<OUT> out) throws Exception {
+        processElement1Fn.invoke(this, value, ctx, out);
+    }
+
+    @Override
+    public void processElement2(IN2 value, CoProcessFunction<IN1, IN2, OUT>.Context ctx, Collector<OUT> out) throws Exception {
+        processElement2Fn.invoke(this, value, ctx, out);
+    }
+
+    @Override
+    public void onTimer(long timestamp, CoProcessFunction<IN1, IN2, OUT>.OnTimerContext ctx, Collector<OUT> out) throws Exception {
+        if (onTimerFn != null) {
+            onTimerFn.invoke(this, timestamp, ctx, out);
+        }
+    }
+
 }

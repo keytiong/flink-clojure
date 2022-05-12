@@ -2,7 +2,10 @@ package io.kosong.flink.clojure.functions;
 
 
 import clojure.java.api.Clojure;
-import clojure.lang.*;
+import clojure.lang.APersistentMap;
+import clojure.lang.IFn;
+import clojure.lang.Keyword;
+import clojure.lang.Namespace;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.configuration.Configuration;
@@ -10,27 +13,22 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public class CljSourceFunction<OUT> extends RichSourceFunction<OUT>
         implements ResultTypeQueryable<OUT>, CheckpointedFunction {
-
-    private static final Logger log = LogManager.getLogger(CljSourceFunction.class);
-
-    private TypeInformation<OUT> returnType;
 
     private transient boolean initialized = false;
     private transient Object state;
 
     private final Namespace namespace;
+    private TypeInformation<OUT> returnType;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
-    private final IFn runFn ;
-    private final IFn cancelFn;
     private final IFn initializeStateFn;
     private final IFn snapshotStateFn;
+    private final IFn runFn ;
+    private final IFn cancelFn;
 
     public CljSourceFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);

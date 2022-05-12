@@ -15,50 +15,33 @@ import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.Window;
 import org.apache.flink.util.Collector;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public class CljProcessWindowFunction<IN, OUT, KEY, W extends Window> extends ProcessWindowFunction<IN, OUT,KEY,W>
         implements ResultTypeQueryable<OUT>, CheckpointedFunction {
-
-    private static final Logger log = LogManager.getLogger(CljProcessWindowFunction.class);
 
     private transient boolean initialized = false;
     private transient Object state;
 
     private final Namespace namespace;
+    private TypeInformation<OUT> returnType;
     private final IFn initFn;
     private final IFn openFn;
     private final IFn closeFn;
-    private final IFn processFn;
-    private final IFn clearFn;
     private final IFn initializeStateFn;
     private final IFn snapshotStateFn;
-
-    private TypeInformation<OUT> returnType;
+    private final IFn processFn;
+    private final IFn clearFn;
 
     public CljProcessWindowFunction(APersistentMap args) {
         namespace = (Namespace) Keyword.intern("ns").invoke(args);
+        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
         initFn = (IFn) Keyword.intern("init").invoke(args);
         openFn = (IFn) Keyword.intern("open").invoke(args);
-        processFn = (IFn) Keyword.intern("process").invoke(args);
-        clearFn = (IFn) Keyword.intern("clear").invoke(args);
         closeFn = (IFn) Keyword.intern("close").invoke(args);
         initializeStateFn = (IFn) Keyword.intern("initializeState").invoke(args);
         snapshotStateFn = (IFn) Keyword.intern("snapshotState").invoke(args);
-        returnType = (TypeInformation) Keyword.intern("returns").invoke(args);
-    }
-
-    @Override
-    public void process(KEY key, ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx, Iterable<IN> elements, Collector<OUT> out) throws Exception {
-        processFn.invoke(this, key, ctx, elements, out);
-    }
-
-    @Override
-    public void clear(ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx) {
-        if (clearFn != null) {
-            clearFn.invoke(this, ctx);
-        }
+        processFn = (IFn) Keyword.intern("process").invoke(args);
+        clearFn = (IFn) Keyword.intern("clear").invoke(args);
     }
 
     private void init() {
@@ -109,6 +92,18 @@ public class CljProcessWindowFunction<IN, OUT, KEY, W extends Window> extends Pr
         }
         if (initializeStateFn != null) {
             initializeStateFn.invoke(this, context);
+        }
+    }
+
+    @Override
+    public void process(KEY key, ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx, Iterable<IN> elements, Collector<OUT> out) throws Exception {
+        processFn.invoke(this, key, ctx, elements, out);
+    }
+
+    @Override
+    public void clear(ProcessWindowFunction<IN, OUT, KEY, W>.Context ctx) {
+        if (clearFn != null) {
+            clearFn.invoke(this, ctx);
         }
     }
 }
