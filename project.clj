@@ -1,4 +1,4 @@
-(defproject io.kosong.flink/flink-clojure "0.2.0"
+(defproject io.kosong.flink/flink-clojure "0.3.0-SNAPSHOT"
   :description "Clojure wrapper for Apache Flink"
   :url "https://github.com/keytiong/flink-clojure"
   :license {:name "The MIT License"
