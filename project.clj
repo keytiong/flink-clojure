@@ -18,5 +18,5 @@
 
   :profiles {:provided
              {:dependencies
-              [[org.apache.flink/flink-streaming-java_2.11 "1.14.4"]]}}
+              [[org.apache.flink/flink-streaming-java "1.15.0"]]}}
   )
